@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combined Quiz App</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- react-simple-maps UMD build -->
+<script src="https://unpkg.com/react-simple-maps@3.0.0/dist/react-simple-maps.umd.min.js"></script>
+
+
+
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f0f4f8; /* A slightly softer background */
+    }
+    /* Additional global styles if needed */
+</style>
+
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React; // Common hooks
+        const { ComposableMap, Geographies, Geography, ZoomableGroup, Graticule, Sphere } = ReactSimpleMaps; // Components from react-simple-maps
+
+// Helper to show loading message and prevent race conditions
+function Root() {
+    const [isReady, setIsReady] = useState(false);
+    useEffect(() => {
+        // This brief delay ensures all external scripts like ReactSimpleMaps are fully loaded.
+        setTimeout(() => setIsReady(true), 50); 
+    }, []);
+
+    if (!isReady) {
+        return <div style={{textAlign: 'center', marginTop: '50px', fontSize: '24px'}}>Loading Quizzes...</div>;
+    }
+    return <App />;
+}
+
+const states = [
+  { name: 'Alabama', path: 'M 580 340 L 620 340 L 620 380 L 580 380 Z', x: 600, y: 360 },
+  { name: 'Alaska', path: 'M 80 380 L 140 380 L 140 440 L 80 440 Z', x: 110, y: 410 },
+  { name: 'Arizona', path: 'M 200 340 L 260 340 L 260 400 L 200 400 Z', x: 230, y: 370 },
+  { name: 'Arkansas', path: 'M 500 320 L 540 320 L 540 360 L 500 360 Z', x: 520, y: 340 },
+  { name: 'California', path: 'M 80 240 L 120 240 L 120 340 L 80 340 Z', x: 100, y: 290 },
+  { name: 'Colorado', path: 'M 320 280 L 380 280 L 380 320 L 320 320 Z', x: 350, y: 300 },
+  { name: 'Connecticut', path: 'M 720 200 L 740 200 L 740 220 L 720 220 Z', x: 730, y: 210 },
+  { name: 'Delaware', path: 'M 700 240 L 710 240 L 710 260 L 700 260 Z', x: 705, y: 250 },
+  { name: 'Florida', path: 'M 600 400 L 640 400 L 640 480 L 600 480 Z', x: 620, y: 440 },
+  { name: 'Georgia', path: 'M 620 340 L 660 340 L 660 400 L 620 400 Z', x: 640, y: 370 },
+  { name: 'Hawaii', path: 'M 200 440 L 240 440 L 240 460 L 200 460 Z', x: 220, y: 450 },
+  { name: 'Idaho', path: 'M 180 140 L 220 140 L 220 220 L 180 220 Z', x: 200, y: 180 },
+  { name: 'Illinois', path: 'M 540 240 L 580 240 L 580 300 L 540 300 Z', x: 560, y: 270 },
+  { name: 'Indiana', path: 'M 580 240 L 620 240 L 620 300 L 580 300 Z', x: 600, y: 270 },
+  { name: 'Iowa', path: 'M 480 220 L 540 220 L 540 260 L 480 260 Z', x: 510, y: 240 },
+  { name: 'Kansas', path: 'M 420 300 L 500 300 L 500 340 L 420 340 Z', x: 460, y: 320 },
+  { name: 'Kentucky', path: 'M 560 300 L 640 300 L 640 320 L 560 320 Z', x: 600, y: 310 },
+  { name: 'Louisiana', path: 'M 520 380 L 560 380 L 560 420 L 520 420 Z', x: 540, y: 400 },
+  { name: 'Maine', path: 'M 740 120 L 760 120 L 760 180 L 740 180 Z', x: 750, y: 150 },
+  { name: 'Maryland', path: 'M 680 260 L 720 260 L 720 280 L 680 280 Z', x: 700, y: 270 },
+  { name: 'Massachusetts', path: 'M 720 180 L 760 180 L 760 200 L 720 200 Z', x: 740, y: 190 },
+  { name: 'Michigan', path: 'M 580 180 L 620 180 L 620 240 L 580 240 Z', x: 600, y: 210 },
+  { name: 'Minnesota', path: 'M 480 140 L 540 140 L 540 220 L 480 220 Z', x: 510, y: 180 },
+  { name: 'Mississippi', path: 'M 560 340 L 580 340 L 580 400 L 560 400 Z', x: 570, y: 370 },
+  { name: 'Missouri', path: 'M 500 280 L 560 280 L 560 340 L 500 340 Z', x: 530, y: 310 },
+  { name: 'Montana', path: 'M 240 120 L 360 120 L 360 180 L 240 180 Z', x: 300, y: 150 },
+  { name: 'Nebraska', path: 'M 380 260 L 480 260 L 480 300 L 380 300 Z', x: 430, y: 280 },
+  { name: 'Nevada', path: 'M 140 240 L 180 240 L 180 320 L 140 320 Z', x: 160, y: 280 },
+  { name: 'New Hampshire', path: 'M 720 160 L 740 160 L 740 200 L 720 200 Z', x: 730, y: 180 },
+  { name: 'New Jersey', path: 'M 700 220 L 720 220 L 720 260 L 700 260 Z', x: 710, y: 240 },
+  { name: 'New Mexico', path: 'M 260 340 L 320 340 L 320 400 L 260 400 Z', x: 290, y: 370 },
+  { name: 'New York', path: 'M 660 180 L 720 180 L 720 240 L 660 240 Z', x: 690, y: 210 },
+  { name: 'North Carolina', path: 'M 640 300 L 720 300 L 720 340 L 640 340 Z', x: 680, y: 320 },
+  { name: 'North Dakota', path: 'M 380 140 L 480 140 L 480 180 L 380 180 Z', x: 430, y: 160 },
+  { name: 'Ohio', path: 'M 620 240 L 660 240 L 660 300 L 620 300 Z', x: 640, y: 270 },
+  { name: 'Oklahoma', path: 'M 420 340 L 520 340 L 520 380 L 420 380 Z', x: 470, y: 360 },
+  { name: 'Oregon', path: 'M 80 180 L 140 180 L 140 240 L 80 240 Z', x: 110, y: 210 },
+  { name: 'Pennsylvania', path: 'M 660 220 L 720 220 L 720 260 L 660 260 Z', x: 690, y: 240 },
+  { name: 'Rhode Island', path: 'M 740 200 L 750 200 L 750 210 L 740 210 Z', x: 745, y: 205 },
+  { name: 'South Carolina', path: 'M 660 340 L 700 340 L 700 380 L 660 380 Z', x: 680, y: 360 },
+  { name: 'South Dakota', path: 'M 380 180 L 480 180 L 480 220 L 380 220 Z', x: 430, y: 200 },
+  { name: 'Tennessee', path: 'M 540 320 L 640 320 L 640 340 L 540 340 Z', x: 590, y: 330 },
+  { name: 'Texas', path: 'M 320 380 L 480 380 L 480 480 L 320 480 Z', x: 400, y: 430 },
+  { name: 'Utah', path: 'M 220 280 L 280 280 L 280 340 L 220 340 Z', x: 250, y: 310 },
+  { name: 'Vermont', path: 'M 700 160 L 720 160 L 720 200 L 700 200 Z', x: 710, y: 180 },
+  { name: 'Virginia', path: 'M 660 280 L 720 280 L 720 320 L 660 320 Z', x: 690, y: 300 },
+  { name: 'Washington', path: 'M 80 120 L 140 120 L 140 180 L 80 180 Z', x: 110, y: 150 },
+  { name: 'West Virginia', path: 'M 640 260 L 680 260 L 680 300 L 640 300 Z', x: 660, y: 280 },
+  { name: 'Wisconsin', path: 'M 540 180 L 580 180 L 580 240 L 540 240 Z', x: 560, y: 210 },
+  { name: 'Wyoming', path: 'M 280 220 L 360 220 L 360 280 L 280 280 Z', x: 320, y: 250 }
+];
+
+const difficultyTimes = {
+  easy: 30,
+  medium: 20,
+  hard: 10
+};
+
+function USStatesQuiz() {
+  const [gameMode, setGameMode] = useState(null);
+  const [difficulty, setDifficulty] = useState('easy');
+  const [currentState, setCurrentState] = useState(null);
+  const [score, setScore] = useState(0);
+  const [totalAttempts, setTotalAttempts] = useState(0);
+  const [time, setTime] = useState(0);
+  const [isGameActive, setIsGameActive] = useState(false);
+  const [selectedState, setSelectedState] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+  const [usedStates, setUsedStates] = useState(new Set());
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (isGameActive && gameMode === 'stopwatch') {
+      intervalRef.current = setInterval(() => {
+        setTime(prev => prev + 1);
+      }, 1000);
+    } else if (isGameActive && gameMode === 'timer') {
+      intervalRef.current = setInterval(() => {
+        setTime(prev => {
+          if (prev <= 1) {
+            handleTimeUp();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isGameActive, gameMode]);
+
+  const handleTimeUp = () => {
+    setIsGameActive(false);
+    setFeedback('incorrect');
+    setTimeout(() => {
+      getNextState();
+      setFeedback(null);
+    }, 1500);
+  };
+
+  const startGame = () => {
+    setIsGameActive(true);
+    setScore(0);
+    setTotalAttempts(0);
+    setUsedStates(new Set());
+    if (gameMode === 'timer') {
+      setTime(difficultyTimes[difficulty]);
+    } else {
+      setTime(0);
+    }
+    getNextState();
+  };
+
+  const getNextState = () => {
+    const availableStates = states.filter(state => !usedStates.has(state.name));
+    if (availableStates.length === 0) {
+      // Game completed
+      setIsGameActive(false);
+      setCurrentState(null);
+      return;
+    }
+    const randomState = availableStates[Math.floor(Math.random() * availableStates.length)];
+    setCurrentState(randomState);
+    setSelectedState(null);
+    if (gameMode === 'timer') {
+      setTime(difficultyTimes[difficulty]);
+    }
+  };
+
+  const handleStateClick = (stateName) => {
+    if (!isGameActive || !currentState || feedback) return;
+
+    setSelectedState(stateName);
+    setTotalAttempts(prev => prev + 1);
+
+    if (stateName === currentState.name) {
+      setScore(prev => prev + 1);
+      setFeedback('correct');
+      setUsedStates(prev => new Set(prev).add(currentState.name));
+    } else {
+      setFeedback('incorrect');
+    }
+
+    setTimeout(() => {
+      setFeedback(null);
+      getNextState();
+    }, 1500);
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const resetGame = () => {
+    setGameMode(null);
+    setIsGameActive(false);
+    setCurrentState(null);
+    setScore(0);
+    setTotalAttempts(0);
+    setTime(0);
+    setSelectedState(null);
+    setFeedback(null);
+    setUsedStates(new Set());
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4">
+      <h1 className="text-3xl font-bold mb-4">US States Quiz</h1>
+
+      {!gameMode && (
+        <div className="space-y-4">
+          <div>
+            <label className="mr-2 font-semibold">Select Game Mode:</label>
+            <select
+              className="border rounded p-1"
+              onChange={e => setGameMode(e.target.value)}
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Choose mode
+              </option>
+              <option value="stopwatch">Stopwatch</option>
+              <option value="timer">Timer</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mr-2 font-semibold">Select Difficulty:</label>
+            <select
+              className="border rounded p-1"
+              onChange={e => setDifficulty(e.target.value)}
+              value={difficulty}
+            >
+              <option value="easy">Easy (30s)</option>
+              <option value="medium">Medium (20s)</option>
+              <option value="hard">Hard (10s)</option>
+            </select>
+          </div>
+
+          <button
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            onClick={startGame}
+            disabled={!gameMode}
+          >
+            Start Game
+          </button>
+        </div>
+      )}
+
+      {gameMode && (
+        <div className="w-full max-w-4xl flex flex-col items-center">
+          <div className="mb-4 flex justify-between w-full px-4">
+            <div>
+              <span className="font-semibold">Mode:</span> {gameMode}
+            </div>
+            <div>
+              <span className="font-semibold">Difficulty:</span> {difficulty}
+            </div>
+            <div>
+              <span className="font-semibold">Time:</span>{' '}
+              {gameMode === 'stopwatch' ? formatTime(time) : formatTime(time)}
+            </div>
+            <div>
+              <span className="font-semibold">Score:</span> {score} / {totalAttempts}
+            </div>
+            <button
+              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+              onClick={resetGame}
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="relative w-[760px] h-[500px] border border-gray-300 rounded">
+            <svg
+              viewBox="0 0 800 500"
+              className="w-full h-full"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {states.map(state => {
+                const isSelected = selectedState === state.name;
+                const isCurrent = currentState?.name === state.name;
+                const isUsed = usedStates.has(state.name);
+
+                let fill = 'white';
+                if (feedback && isSelected) {
+                  fill = feedback === 'correct' ? '#34D399' : '#F87171'; // green or red
+                } else if (isUsed) {
+                  fill = '#D1D5DB'; // gray for used
+                } else if (isCurrent && !feedback) {
+                  fill = '#BFDBFE'; // light blue for current, but don't show when giving feedback
+                }
+
+                return (
+                  <path
+                    key={state.name}
+                    d={state.path}
+                    fill={fill}
+                    stroke="#374151"
+                    strokeWidth={1}
+                    className={`cursor-pointer hover:stroke-blue-600 hover:stroke-2 transition-all duration-200`}
+                    onClick={() => handleStateClick(state.name)}
+                    aria-label={state.name}
+                    tabIndex={0}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleStateClick(state.name);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </svg>
+
+            {currentState && (
+              <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-1 rounded shadow">
+                <span className="font-semibold">Find:</span> {currentState.name}
+              </div>
+            )}
+          </div>
+
+          {feedback && (
+            <div
+              className={`mt-4 text-lg font-semibold ${
+                feedback === 'correct' ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
+              {feedback === 'correct' ? 'Correct!' : 'Incorrect!'}
+            </div>
+          )}
+
+          {!isGameActive && currentState === null && totalAttempts > 0 && (
+            <div className="mt-6 text-center">
+              <h2 className="text-2xl font-bold mb-2">Game Over</h2>
+              <p className="mb-2">
+                Your final score: {score} / {totalAttempts}
+              </p>
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                onClick={resetGame}
+              >
+                Play Again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+
+const ALL_STATES = [
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"
+];
+
+const DIFFICULTY_SECONDS = {
+  easy: 300, // 5 min
+  medium: 180, // 3 min
+  hard: 60 // 1 min
+};
+
+function StateMapQuiz() {
+  const [mounted, setMounted] = useState(false);
+  const [mode, setMode] = useState("stopwatch");
+  const [difficulty, setDifficulty] = useState("easy");
+  const [running, setRunning] = useState(false);
+  const [time, setTime] = useState(0);
+  const [targetState, setTargetState] = useState(null);
+  const [remaining, setRemaining] = useState([]);
+  const [guessed, setGuessed] = useState(new Set());
+  const [lastWrong, setLastWrong] = useState(null);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!running) return;
+    intervalRef.current = setInterval(() => {
+      setTime((prev) => {
+        if (mode === "stopwatch") return prev + 1;
+        if (prev === 1) { // Check when 1, so it displays 0 before stopping
+          stopGame();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [running, mode]);
+
+  const startGame = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setGuessed(new Set());
+    const allStatesCopy = [...ALL_STATES];
+    setRemaining(allStatesCopy);
+    const first = randomState(allStatesCopy);
+    setTargetState(first);
+    setRunning(true);
+    setLastWrong(null);
+    setTime(mode === "timer" ? DIFFICULTY_SECONDS[difficulty] : 0);
+  };
+
+  const stopGame = () => {
+    setRunning(false);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
+
+  const randomState = (list) => {
+    return list[Math.floor(Math.random() * list.length)];
+  };
+
+  const handleStateClick = (name) => {
+    if (!running || !targetState) return;
+    if (name === targetState) {
+      const newGuessed = new Set(guessed);
+      newGuessed.add(name);
+      setGuessed(newGuessed);
+      const newRemaining = remaining.filter((s) => s !== name);
+      setRemaining(newRemaining);
+      if (newRemaining.length === 0) {
+        stopGame();
+        setTargetState(null);
+        return;
+      }
+      setTargetState(randomState(newRemaining));
+      setLastWrong(null); // Clear wrong state indicator on correct guess
+    } else {
+      setLastWrong(name);
+      setTimeout(() => setLastWrong(null), 1000);
+    }
+  };
+
+  const formatTime = (sec) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, "0");
+    const s = (sec % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+  
+  const isGameOver = !running && (guessed.size === 50 || (mode === 'timer' && time === 0));
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8">
+      <h1 className="text-3xl font-bold mb-6 text-blue-700">50 States Map Quiz</h1>
+
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex items-center gap-2">
+          <label className="font-medium">Mode:</label>
+          <select
+            className="border rounded px-2 py-1"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            disabled={running}
+          >
+            <option value="stopwatch">Stopwatch</option>
+            <option value="timer">Timer</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="font-medium">Difficulty:</label>
+          <select
+            className="border rounded px-2 py-1"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value)}
+            disabled={running || mode === "stopwatch"}
+          >
+            <option value="easy">Easy (5 min)</option>
+            <option value="medium">Medium (3 min)</option>
+            <option value="hard">Hard (1 min)</option>
+          </select>
+        </div>
+        <button
+          onClick={running ? stopGame : startGame}
+          className={`px-4 py-2 rounded text-white ${running ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}`}
+        >
+          {isGameOver ? "Play Again" : (running ? "Stop" : "Start")}
+        </button>
+      </div>
+
+      <div className="flex flex-col items-center gap-2 mb-4">
+        <div className="text-xl font-semibold text-gray-800">
+          Time: <span className="font-mono">{formatTime(time)}</span>
+        </div>
+        <div className="text-lg text-gray-700">
+          {running && targetState ? (
+            <>
+              Find: <span className="font-bold text-blue-700">{targetState}</span>
+            </>
+          ) : (
+            "Press Start to play"
+          )}
+        </div>
+        <div className="text-sm text-gray-600">Score: {guessed.size}/50</div>
+      </div>
+
+      <div className="w-full max-w-4xl">
+        {mounted && (
+          <ComposableMap projection="geoAlbersUsa">
+            <Geographies geography={GEO_URL}>
+              {({ geographies }) =>
+                geographies.map((geo) => {
+                  const name = geo.properties.name;
+                  const isGuessed = guessed.has(name);
+                  const isWrong = lastWrong === name;
+                  return (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      onClick={() => handleStateClick(name)}
+                      style={{
+                        default: {
+                          fill: isGuessed
+                            ? "#16a34a" /* green-600 */
+                            : isWrong
+                            ? "#dc2626" /* red-600 */
+                            : "#e5e7eb", /* gray-200 */
+                          stroke: "#ffffff",
+                          strokeWidth: 0.75,
+                          outline: "none"
+                        },
+                        hover: {
+                          fill: running && !isGuessed ? "#93c5fd" : (isGuessed ? "#15803d" : "#e5e7eb"), /* blue-300 on hover if active */
+                          stroke: "#ffffff",
+                          strokeWidth: 1,
+                          outline: "none",
+                          cursor: running ? "pointer" : "default"
+                        },
+                        pressed: {
+                          fill: running && !isGuessed ? "#60a5fa" : (isGuessed ? "#15803d" : "#e5e7eb"), /* blue-400 on press if active */
+                          stroke: "#ffffff",
+                          strokeWidth: 1,
+                          outline: "none"
+                        }
+                      }}
+                    />
+                  );
+                })
+              }
+            </Geographies>
+          </ComposableMap>
+        )}
+      </div>
+        
+      {isGameOver && (
+        <div className="mt-4 text-2xl font-bold">
+            {guessed.size === 50 ? (
+                 <span className="text-green-700">Congratulations! You identified all 50 states.</span>
+            ) : (
+                 <span className="text-red-600">Time's up! Try again.</span>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+    const [currentQuiz, setCurrentQuiz] = useState(null);
+
+    const selectQuiz = (quizName) => {
+        setCurrentQuiz(quizName);
+        window.scrollTo(0, 0);
+    };
+    
+    const backToSelection = () => {
+        setCurrentQuiz(null);
+        window.scrollTo(0,0);
+    }
+
+    if (!currentQuiz) {
+        return (
+            <div className="container mx-auto p-4 min-h-screen flex flex-col items-center justify-center">
+                <div className="bg-white shadow-xl rounded-lg p-8 md:p-12">
+                    <h1 className="text-4xl md:text-5xl font-bold text-center text-blue-700 mb-8 md:mb-12">React Quiz Collection</h1>
+                    <div className="quiz-nav text-center space-y-6">
+                        <h2 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-6">Choose a Quiz:</h2>
+                        <button 
+                            onClick={() => selectQuiz('usStates')}
+                            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg text-lg transition-colors duration-300 ease-in-out transform hover:scale-105"
+                        >
+                            US States Quiz (Custom SVG)
+                        </button>
+                        <button 
+                            onClick={() => selectQuiz('stateMap')}
+                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg text-lg transition-colors duration-300 ease-in-out transform hover:scale-105"
+                        >
+                            50 States Map Quiz (Geo Maps)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container mx-auto p-4">
+            <button 
+                onClick={backToSelection}
+                className="mb-6 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300 ease-in-out flex items-center"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+                Back to Quiz Selection
+            </button>
+            {currentQuiz === 'usStates' && <USStatesQuiz />}
+            {currentQuiz === 'stateMap' && <StateMapQuiz />}
+        </div>
+    );
+}
+
+ReactDOM.render(<Root />, document.getElementById('root'));
+</script>
+</body>
+</html>
